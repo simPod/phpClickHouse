@@ -75,7 +75,6 @@ class Bindings implements \ClickHouseDB\Query\Degeneration
     /**
      * Compile Bindings
      *
-     * @param $sql
      * @return mixed
      */
     public function process($sql)

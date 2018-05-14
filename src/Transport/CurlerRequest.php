@@ -20,9 +20,11 @@ class CurlerRequest
     private $options;
 
     /**
-     * @var
+     * Parsed reponse header object.
+     *
+     * @var mixed[]
      */
-    private $headers; // Parsed reponse header object.
+    private $headers;
 
     /**
      * @var

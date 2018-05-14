@@ -3,6 +3,10 @@
 namespace ClickHouseDB\Query;
 
 use ClickHouseDB\Exception\QueryException;
+use function dirname;
+use function is_file;
+use function is_writable;
+use function unlink;
 
 class WriteToFile
 {
@@ -24,73 +28,55 @@ class WriteToFile
      */
     private $format='CSV';
 
-    /**
-     * @var bool
-     */
-    private $gzip=false;
-    /**
-     * WriteToFile constructor.
-     * @param $file_name
-     * @param bool $overwrite
-     * @param null $format
-     */
-    public function __construct($file_name,$overwrite=true,$format=null) {
+    /** @var bool */
+    private $gzip = false;
 
-
-        if (!$file_name)
-        {
+    public function __construct(string $fileName, bool $overwrite = true, ?string $format = null)
+    {
+        if (!$fileName) {
             throw new QueryException('Bad file path');
         }
 
-        if (is_file($file_name))
-        {
-            if (!$overwrite)
-            {
-                throw new QueryException('File exists: ' . $file_name);
+        if (is_file($fileName)) {
+            if (!$overwrite) {
+                throw new QueryException('File exists: ' . $fileName);
             }
-            if (!unlink($file_name))
-            {
-                throw new QueryException('Can`t delete: ' . $file_name);
+
+            if (!unlink($fileName)) {
+                throw new QueryException('Can`t delete: ' . $fileName);
             }
         }
-        $dir=dirname($file_name);
-        if (!is_writable($dir))
-        {
+
+        $dir = dirname($fileName);
+
+        if (!is_writable($dir)) {
             throw new QueryException('Can`t writable dir: ' . $dir);
         }
-        if ($format)
-        {
-           $this->setFormat($format);
+
+        if ($format !== null) {
+            $this->setFormat($format);
         }
-        $this->file_name=$file_name;
+
+        $this->file_name = $fileName;
     }
 
-    /**
-     * @return bool
-     */
-    public function getGzip()
+    public function getGzip() : bool
     {
         return $this->gzip;
     }
 
-    /**
-     * @param $flag
-     */
-    public function setGzip($flag)
+    public function setGzip(bool $flag) : void
     {
-        $this->gzip=$flag;
+        $this->gzip = $flag;
     }
 
-    /**
-     * @param $format
-     */
-    public function setFormat($format)
+    public function setFormat(string $format)
     {
         if (!in_array($format,$this->support_format))
         {
             throw new QueryException('Unsupport format: ' . $format);
         }
-        $this->format=$format;
+        $this->format = $format;
     }
     /**
      * @return int

@@ -12,11 +12,8 @@ class FormatLine
 
     /**
      * Format
-     *
-     * @param $format
-     * @return StrictQuoteLine
      */
-    private static function strictQuote($format)
+    private static function strictQuote(string $format) : StrictQuoteLine
     {
         if (empty(self::$strict[$format]))
         {

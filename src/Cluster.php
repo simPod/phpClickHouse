@@ -2,11 +2,13 @@
 namespace ClickHouseDB;
 
 use ClickHouseDB\Exception\QueryException;
+use function gethostbynamel;
+use function is_array;
 
 class Cluster
 {
     /**
-     * @var array
+     * @var string[]
      */
     private $nodes = [];
 
@@ -39,10 +41,8 @@ class Cluster
      */
     private $defaultHostName;
 
-    /**
-     * @var int
-     */
-    private $scanTimeOut=10;
+    /** @var float */
+    private $scanTimeOut = 10;
 
     /**
      * @var array
@@ -80,15 +80,12 @@ class Cluster
     private $_table_size_cache=[];
 
     /**
-     * Cluster constructor.
-     *
-     * @param $connect_params
-     * @param array $settings
-     * @param int $scanTimeOut
+     * @param mixed[] $connectParams
+     * @param mixed[] $settings
      */
-    public function __construct($connect_params, $settings = [])
+    public function __construct(array $connectParams, array $settings = [])
     {
-        $this->defaultClient = new Client($connect_params, $settings);
+        $this->defaultClient = new Client($connectParams, $settings);
         $this->defaultHostName = $this->defaultClient->getConnectHost();
         $this->setNodes(gethostbynamel($this->defaultHostName));
     }
@@ -101,34 +98,28 @@ class Cluster
         return $this->defaultClient;
     }
 
-    /**
-     * @param $softCheck
-     */
-    public function setSoftCheck($softCheck)
+    public function setSoftCheck(bool $softCheck) : void
     {
         $this->softCheck = $softCheck;
     }
 
-    /**
-     * @param $scanTimeOut
-     */
-    public function setScanTimeOut($scanTimeOut)
+    public function setScanTimeOut(float $scanTimeOut) : void
     {
         $this->scanTimeOut = $scanTimeOut;
     }
 
     /**
-     * @param $nodes
+     * @param string[] $nodes
      */
-    public function setNodes($nodes)
+    public function setNodes(array $nodes) : void
     {
         $this->nodes = $nodes;
     }
 
     /**
-     * @return array
+     * @return string[]
      */
-    public function getNodes()
+    public function getNodes() : array
     {
         return $this->nodes;
     }
@@ -159,18 +150,12 @@ class Cluster
      * Проверяете состояние кластера, запрос взят из документации к CH
      * total_replicas<2 - не подходит для без репликационных кластеров
      *
-     *
-     * @param $replicas
-     * @return bool
+     * @param mixed[] $replicas
      */
-    private function isReplicasWork($replicas)
+    private function isReplicationWorking(array $replicas) : bool
     {
         $ok = true;
-        if (!is_array($replicas)) {
-            // @todo нет массива ошибка, т/к мы работем с репликами?
-            // @todo Как быть есть в кластере НЕТ реплик ?
-            return false;
-        }
+
         foreach ($replicas as $replica) {
             if ($replica['is_readonly']) {
                 $ok = false;
@@ -304,12 +289,19 @@ class Cluster
             }
             $this->hostsnames = $hosts;
             $this->tables = $tables;
-            // ---------------------------------------------------------------------------------------------------
-            // Let's check that replication goes well
-            $rIsOk = $this->isReplicasWork($result['replicas'][$node]);
+
+            if (is_array($result['replicas'][$node])) {
+                $rIsOk = $this->isReplicationWorking($result['replicas'][$node]);
+            } else {
+                // @todo нет массива ошибка, т/к мы работем с репликами?
+                // @todo Как быть есть в кластере НЕТ реплик ?
+                $rIsOk = false;
+            }
+
             $result['replicasIsOk'][$node] = $rIsOk;
-            if (!$rIsOk) $replicasIsOk = false;
-            // ---------------------------------------------------------------------------------------------------
+            if (!$rIsOk) {
+                $replicasIsOk = false;
+            }
         }
 
         // badNodes = array(6) {  '222.222.222.44' =>  string(13) "HttpCode:0 ; " , '222.222.222.11' =>  string(13) "HttpCode:0 ; "
@@ -400,13 +392,9 @@ class Cluster
         return $this->client($this->nodes[0]);
     }
 
-    /**
-     * @param $cluster
-     * @return int
-     */
-    public function getClusterCountShard($cluster)
+    public function getClusterCountShard(string $clusterName) : int
     {
-        $table = $this->getClusterInfoTable($cluster);
+        $table = $this->getClusterInfoTable($clusterName);
         $c = [];
         foreach ($table as $row) {
             $c[$row['shard_num']] = 1;
@@ -414,13 +402,9 @@ class Cluster
         return sizeof($c);
     }
 
-    /**
-     * @param $cluster
-     * @return int
-     */
-    public function getClusterCountReplica($cluster)
+    public function getClusterCountReplica(string $clusterName) : int
     {
-        $table = $this->getClusterInfoTable($cluster);
+        $table = $this->getClusterInfoTable($clusterName);
         $c = [];
         foreach ($table as $row) {
             $c[$row['replica_num']] = 1;
@@ -429,23 +413,21 @@ class Cluster
     }
 
     /**
-     * @param $cluster
      * @return mixed
      */
-    public function getClusterInfoTable($cluster)
+    public function getClusterInfoTable(string $clusterName)
     {
         $this->connect();
-        if (empty($this->resultScan['cluster.list'][$cluster])) throw new QueryException('Cluster not find:' . $cluster);
-        return $this->resultScan['cluster.list'][$cluster];
+        if (empty($this->resultScan['cluster.list'][$clusterName])) throw new QueryException('Cluster not find:' . $clusterName);
+        return $this->resultScan['cluster.list'][$clusterName];
     }
 
     /**
-     * @param $cluster
-     * @return array
+     * @return string[]
      */
-    public function getClusterNodes($cluster)
+    public function getClusterNodes(string $clusterName) : array
     {
-        return array_keys($this->getClusterInfoTable($cluster));
+        return array_keys($this->getClusterInfoTable($clusterName));
     }
 
     /**
@@ -487,14 +469,11 @@ class Cluster
     /**
      * Table size on cluster
      *
-     * @param $database_table
      * @return array
-     *
      */
-    public function getSizeTable($database_table)
+    public function getSizeTable(string $tableName)
     {
-       $list=[];
-       $nodes=$this->getNodesByTable($database_table);
+       $nodes=$this->getNodesByTable($tableName);
         // scan need node`s
         foreach ($nodes as $node)
         {
@@ -517,25 +496,22 @@ class Cluster
             }
         }
 
-        if (empty($sizes[$database_table]))
-        {
+        if (empty($sizes[$tableName])) {
             return null;
         }
-        return $sizes[$database_table]['total']['sizebytes'];
+
+        return $sizes[$tableName]['total']['sizebytes'];
     }
 
 
     /**
      * Truncate on all nodes
-     *
-     * @param $database_table
-     * @return array
      */
-    public function truncateTable($database_table,$timeOut=2000)
+    public function truncateTable(string $tableName, $timeOut=2000) : array
     {
         $out=[];
-        list($db,$table)=explode('.',$database_table);
-        $nodes=$this->getMasterNodeForTable($database_table);
+        list($db,$table)=explode('.',$tableName);
+        $nodes=$this->getMasterNodeForTable($tableName);
         // scan need node`s
         foreach ($nodes as $node)
         {
@@ -547,39 +523,33 @@ class Cluster
         return $out;
     }
 
-    /**
-     * is_leader node
-     *
-     * @param $database_table
-     * @return array
-     */
-    public function getMasterNodeForTable($database_table)
+    public function getMasterNodeForTable(string $tableName) : array
     {
         $list=$this->getTables(true);
 
-        if (empty($list[$database_table])) return [];
+        if (empty($list[$tableName])) return [];
 
 
         $result=[];
-        foreach ($list[$database_table] as $node=>$row)
+        foreach ($list[$tableName] as $node=> $row)
         {
             if ($row['is_leader']) $result[]=$node;
         }
         return $result;
     }
+
     /**
      * Find nodes by : db_name.table_name
      *
-     * @param $database_table
-     * @return array
+     * @return string[]
      */
-    public function getNodesByTable($database_table)
+    public function getNodesByTable(string $tableName) : array
     {
-        $list=$this->getTables();
-        if (empty($list[$database_table])) {
-            throw new QueryException('Not find :' . $database_table);
+        $list = $this->getTables();
+        if (empty($list[$tableName])) {
+            throw new QueryException('Not find :' . $tableName);
         }
-        return $list[$database_table];
+        return $list[$tableName];
     }
 
     /**

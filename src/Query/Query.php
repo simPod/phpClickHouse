@@ -17,17 +17,13 @@ class Query
      */
     protected $format = null;
 
-    /**
-     * @var array
-     */
-    private $degenerations=[];
+    /** @var Degeneration[] */
+    private $degenerations = [];
 
     /**
-     * Query constructor.
-     * @param $sql
-     * @param array $degenerations
+     * @param Degeneration[] $degenerations
      */
-    public function __construct($sql,$degenerations=[])
+    public function __construct(string $sql, array $degenerations = [])
     {
         if (!trim($sql))
         {
@@ -37,10 +33,7 @@ class Query
         $this->degenerations=$degenerations;
     }
 
-    /**
-     * @param $format
-     */
-    public function setFormat($format)
+    public function setFormat(string $format) : void
     {
         $this->format = $format;
     }

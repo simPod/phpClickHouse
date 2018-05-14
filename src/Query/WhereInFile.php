@@ -25,13 +25,7 @@ class WhereInFile
     public function __construct() {}
 
 
-    /**
-     * @param $file_name
-     * @param $table_name
-     * @param $structure
-     * @param string $format
-     */
-    public function attachFile($file_name, $table_name, $structure, $format = 'CSV')
+    public function attachFile($file_name, $table_name, $structure, string $format = 'CSV')
     {
         if (!is_readable($file_name)) {
             throw new QueryException('Can`t read file: ' . $file_name);
@@ -65,11 +59,7 @@ class WhereInFile
         return $out;
     }
 
-    /**
-     * @param $table
-     * @return string
-     */
-    public function fetchStructure($table)
+    public function fetchStructure(string $table) : string
     {
         $structure = $this->_files[$table]['structure'];
 

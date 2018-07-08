@@ -77,7 +77,7 @@ jobs:
 
     - stage: Code Quality
       install: travis_retry composer install --prefer-dist
-      script: vendor/bin/phpstan analyse -c phpstan.neon src
+      script: vendor/bin/phpstan analyse
 
 after_script:
   # upload clover.xml file to Scrutinizer to analyze it

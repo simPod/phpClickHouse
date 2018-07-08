@@ -9,13 +9,15 @@ use ClickHouseDB\Query\WriteToFile;
 use ClickHouseDB\Quote\FormatLine;
 use ClickHouseDB\Transport\Http;
 use ClickHouseDB\Transport\Stream;
+use function count;
+use function is_array;
+use function sizeof;
+use function sprintf;
 
 class Client
 {
-    /**
-     * @var Http
-     */
-    private $_transport = null;
+    /** @var Http|null */
+    private $transport;
 
     /**
      * @var string
@@ -44,7 +46,7 @@ class Client
     /**
      * @var array
      */
-    private $_support_format = ['TabSeparated', 'TabSeparatedWithNames', 'CSV', 'CSVWithNames', 'JSONEachRow'];
+    private $supportedFormats = ['TabSeparated', 'TabSeparatedWithNames', 'CSV', 'CSVWithNames', 'JSONEachRow'];
 
     /**
      * Client constructor.
@@ -70,7 +72,7 @@ class Client
         }
 
         if (isset($connect_params['settings']) && is_array($connect_params['settings'])) {
-            if (empty($settings)) {
+            if (count($settings) === 0) {
                 $settings = $connect_params['settings'];
             }
         }
@@ -82,7 +84,7 @@ class Client
 
 
         // init transport class
-        $this->_transport = new Http(
+        $this->transport = new Http(
             $this->_connect_host,
             $this->_connect_port,
             $this->_connect_username,
@@ -90,11 +92,11 @@ class Client
         );
 
 
-        $this->_transport->addQueryDegeneration(new Bindings());
+        $this->transport->addQueryDegeneration(new Bindings());
 
         // apply settings to transport class
         $this->settings()->database('default');
-        if (sizeof($settings)) {
+        if (sizeof($settings) !== 0) {
             $this->settings()->apply($settings);
         }
 
@@ -116,14 +118,13 @@ class Client
 
     /**
      * if the user has only read in the config file
-     *
-     * @param bool $flag
      */
-    public function setReadOnlyUser($flag)
+    public function setReadOnlyUser(bool $flag) : void
     {
         $this->_connect_user_readonly = $flag;
         $this->settings()->setReadOnlyUser($this->_connect_user_readonly);
     }
+
     /**
      * Clear Degeneration processing request [template ]
      *
@@ -131,7 +132,7 @@ class Client
      */
     public function cleanQueryDegeneration()
     {
-        return $this->_transport->cleanQueryDegeneration();
+        return $this->transport->cleanQueryDegeneration();
     }
 
     /**
@@ -142,7 +143,7 @@ class Client
      */
     public function addQueryDegeneration(Query\Degeneration $degeneration)
     {
-        return $this->_transport->addQueryDegeneration($degeneration);
+        return $this->transport->addQueryDegeneration($degeneration);
     }
 
     /**
@@ -152,14 +153,15 @@ class Client
      */
     public function enableQueryConditions()
     {
-        return $this->_transport->addQueryDegeneration(new \ClickHouseDB\Query\Degeneration\Conditions());
+        return $this->transport->addQueryDegeneration(new \ClickHouseDB\Query\Degeneration\Conditions());
     }
+
     /**
      * Set connection host
      *
      * @param string|array $host
      */
-    public function setHost($host)
+    public function setHost($host) : void
     {
 
         if (is_array($host))
@@ -197,7 +199,7 @@ class Client
      *
      * @param int $connectTimeOut
      */
-    public function setConnectTimeOut($connectTimeOut)
+    public function setConnectTimeOut($connectTimeOut) : void
     {
         $this->transport()->setConnectTimeOut($connectTimeOut);
     }
@@ -220,10 +222,10 @@ class Client
      */
     public function transport()
     {
-        if (!$this->_transport) {
+        if ($this->transport === null) {
             throw  new \InvalidArgumentException('Empty transport class');
         }
-        return $this->_transport;
+        return $this->transport;
     }
 
     /**
@@ -265,7 +267,7 @@ class Client
      */
     public function getTransport()
     {
-        return $this->_transport;
+        return $this->transport;
     }
 
 
@@ -287,28 +289,20 @@ class Client
         return $this->transport()->settings();
     }
 
-    /**
-     * @return $this
-     */
-    public function useSession($useSessionId = false)
+    public function useSession(bool $useSessionId = false) : self
     {
-        if (!$this->settings()->getSessionId())
-        {
-            if (!$useSessionId)
-            {
-                $this->settings()->makeSessionId();
-            } else
-            {
+        if ($this->settings()->getSessionId() === null) {
+            if ($useSessionId) {
                 $this->settings()->session_id($useSessionId);
+            } else {
+                $this->settings()->makeSessionId();
             }
-
         }
+
         return $this;
     }
-    /**
-     * @return mixed
-     */
-    public function getSession()
+
+    public function getSessionId() : ?string
     {
         return $this->settings()->getSessionId();
     }
@@ -413,26 +407,15 @@ class Client
         return $this->transport()->executeAsync();
     }
 
-    /**
-     * set progressFunction
-     *
-     * @param callable $callback
-     */
-    public function progressFunction($callback)
+    public function progressFunction(callable $callback) : void
     {
-        if (!is_callable($callback)) {
-            throw new \InvalidArgumentException('Not is_callable progressFunction');
-        }
-
-        if (!$this->settings()->is('send_progress_in_http_headers'))
-        {
+        if (! $this->settings()->is('send_progress_in_http_headers')) {
             $this->settings()->set('send_progress_in_http_headers', 1);
         }
-        if (!$this->settings()->is('http_headers_progress_interval_ms'))
-        {
+
+        if (! $this->settings()->is('http_headers_progress_interval_ms')) {
             $this->settings()->set('http_headers_progress_interval_ms', 100);
         }
-
 
         $this->transport()->setProgressFunction($callback);
     }
@@ -543,9 +526,9 @@ class Client
       * There may be one or more lines inserted, but then the keys inside the array list must match (including in the sequence)
       *
       * @param array $values - array column_name => value (if we insert one row) or array list column_name => value if we insert many lines
-      * @return array - list of arrays - 0 => fields, 1 => list of value arrays for insertion
+      * @return mixed[][] - list of arrays - 0 => fields, 1 => list of value arrays for insertion
       */
-    public function prepareInsertAssocBulk(array $values)
+    public function prepareInsertAssocBulk(array $values) : array
     {
         if (isset($values[0]) && is_array($values[0])) { //случай, когда много строк вставляется
             $preparedFields = array_keys($values[0]);
@@ -597,14 +580,14 @@ class Client
     /**
      * insert Batch Files
      *
-     * @param string $table_name
+     * @param string       $table_name
      * @param string|array $file_names
-     * @param array $columns_array
-     * @param string $format ['TabSeparated','TabSeparatedWithNames','CSV','CSVWithNames']
+     * @param array        $columns
+     * @param string       $format ['TabSeparated','TabSeparatedWithNames','CSV','CSVWithNames']
      * @return array
      * @throws Exception\TransportException
      */
-    public function insertBatchFiles($table_name, $file_names, $columns_array=[], $format = "CSV")
+    public function insertBatchFiles($table_name, $file_names, $columns=[], $format = "CSV")
     {
         if (is_string($file_names))
         {
@@ -614,7 +597,7 @@ class Client
             throw new QueryException('Queue must be empty, before insertBatch, need executeAsync');
         }
 
-        if (!in_array($format, $this->_support_format))
+        if (!in_array($format, $this->supportedFormats, true))
         {
             throw new QueryException('Format not support in insertBatchFiles');
         }
@@ -626,15 +609,12 @@ class Client
                 throw  new QueryException('Cant read file: ' . $fileName . ' ' . (is_file($fileName) ? '' : ' is not file'));
             }
 
-            if (empty($columns_array))
-            {
+            if (count($columns) === 0) {
                 $sql = 'INSERT INTO ' . $table_name . ' FORMAT ' . $format;
-
-            } else
-            {
-                $sql = 'INSERT INTO ' . $table_name . ' ( ' . implode(',', $columns_array) . ' ) FORMAT ' . $format;
-
+            } else {
+                $sql = 'INSERT INTO ' . $table_name . ' ( ' . implode(',', $columns) . ' ) FORMAT ' . $format;
             }
+
             $result[$fileName] = $this->transport()->writeAsyncCSV($sql, $fileName);
         }
 
@@ -655,29 +635,24 @@ class Client
      * insert Batch Stream
      *
      * @param string $table_name
-     * @param array $columns_array
+     * @param array  $columns
      * @param string $format ['TabSeparated','TabSeparatedWithNames','CSV','CSVWithNames']
      * @return Transport\CurlerRequest
      */
-    public function insertBatchStream($table_name, $columns_array=[], $format = "CSV")
+    public function insertBatchStream($table_name, $columns=[], $format = "CSV")
     {
         if ($this->getCountPendingQueue() > 0) {
             throw new QueryException('Queue must be empty, before insertBatch, need executeAsync');
         }
 
-        if (!in_array($format, $this->_support_format))
-        {
+        if (!in_array($format, $this->supportedFormats, true)) {
             throw new QueryException('Format not support in insertBatchFiles');
         }
 
-        if (empty($columns_array))
-        {
+        if (count($columns) === 0) {
             $sql = 'INSERT INTO ' . $table_name . ' FORMAT ' . $format;
-
-        } else
-        {
-            $sql = 'INSERT INTO ' . $table_name . ' ( ' . implode(',', $columns_array) . ' ) FORMAT ' . $format;
-
+        } else {
+            $sql = 'INSERT INTO ' . $table_name . ' ( ' . implode(',', $columns) . ' ) FORMAT ' . $format;
         }
 
         return $this->transport()->writeStreamData($sql);
@@ -913,7 +888,14 @@ class Client
     public function getServerSystemSettings($like='')
     {
         $l=[];
-        $list=$this->select('SELECT * FROM system.settings'.($like ? ' WHERE name LIKE :like':'' ),['like'=>'%'.$like.'%'])->rows();
+        $list = $this->select(
+            sprintf(
+                'SELECT * FROM system.settings%s',
+                $like === '' ? '' : ' WHERE name LIKE :like'
+            ),
+            ['like'=>'%'.$like.'%']
+        )->rows();
+
         foreach ($list as $row) {
             if (isset($row['name'])) {$n=$row['name']; unset($row['name']) ; $l[$n]=$row;}
         }

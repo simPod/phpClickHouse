@@ -150,23 +150,19 @@ class Settings
         $this->set('session_id', $session_id);
         return $this;
     }
-    /**
-     * @return mixed|bool
-     */
-    public function getSessionId()
+
+    public function getSessionId() : ?string
     {
         if (empty($this->settings['session_id'])) {
-            return false;
+            return null;
         }
         return $this->get('session_id');
     }
 
-    /**
-     * @return string|bool
-     */
-    public function makeSessionId()
+    public function makeSessionId() : ?string
     {
         $this->session_id(sha1(uniqid('', true)));
+
         return $this->getSessionId();
     }
 

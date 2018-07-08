@@ -39,11 +39,11 @@ final class SessionsTest extends TestCase
         ');
     }
 
-    public function testUseSession()
+    public function testUseSession() : void
     {
-        $this->assertFalse($this->client->getSession());
+        self::assertNull($this->client->getSessionId());
         $this->client->useSession();
-        $this->assertStringMatchesFormat('%s',$this->client->getSession());
+        self::assertStringMatchesFormat('%s', $this->client->getSessionId());
     }
 
 
@@ -54,7 +54,7 @@ final class SessionsTest extends TestCase
         $table_name_B = 'phpunti_test_B_abcd_' . time();
 
         // make new session id
-        $A_Session_ID = $this->client->useSession()->getSession();
+        $sessionIdA = $this->client->useSession()->getSessionId();
 
         // create table in session A
         $this->client->write(' CREATE TEMPORARY TABLE IF NOT EXISTS ' . $table_name_A . ' (number UInt64)');
@@ -67,7 +67,7 @@ final class SessionsTest extends TestCase
         // reconnect + reinit session
 
         // create table in session B
-        $B_Session_ID = $this->client->useSession()->getSession();
+        $sessionIdB = $this->client->useSession()->getSessionId();
 
         $this->client->write(' CREATE TEMPORARY TABLE IF NOT EXISTS ' . $table_name_B . ' (number UInt64)');
 
@@ -82,7 +82,7 @@ final class SessionsTest extends TestCase
 
         // Reuse session A
 
-        $this->client->useSession($A_Session_ID);
+        $this->client->useSession($sessionIdA);
 
         $st = $this->client->select('SELECT round(avg(number),1) as avs FROM ' . $table_name_A);
         $this->assertEquals(14.5, $st->fetchOne('avs'));
@@ -90,7 +90,7 @@ final class SessionsTest extends TestCase
 
         // Reuse session B
 
-        $this->client->useSession($B_Session_ID);
+        $this->client->useSession($sessionIdB);
 
 
         $st = $this->client->select('SELECT round(avg(number),1) as avs FROM ' . $table_name_B);

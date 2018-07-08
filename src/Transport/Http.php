@@ -181,7 +181,7 @@ class Http
         if ($this->settings()->isEnableHttpCompression()) {
             $new->httpCompression(true);
         }
-        if ($this->settings()->getSessionId())
+        if ($this->settings()->getSessionId() !== null)
         {
             $new->persistent();
         }

@@ -155,7 +155,7 @@ class CurlerRolling
             $count=$loop+$pend;
             $c++;
 
-            if ($c > 20000) {
+            if ($c > 20000000) {
                 break;
             }
             usleep(500);

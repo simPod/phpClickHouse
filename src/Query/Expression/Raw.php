@@ -27,4 +27,9 @@ class Raw implements Expression
     {
         return $this->expression;
     }
+
+    public function __toString() : string
+    {
+        return $this->getValue();
+    }
 }

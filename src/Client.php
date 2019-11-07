@@ -28,7 +28,9 @@ use function is_readable;
 use function is_string;
 use function sprintf;
 use function stripos;
+use function strlen;
 use function strtotime;
+use function substr;
 use function trim;
 
 class Client
@@ -462,12 +464,8 @@ class Client
      * @return Statement
      * @throws Exception\TransportException
      */
-    public function insert(string $table, array $values, array $columns = []) : Statement
+    public function insert(string $table, iterable $values, array $columns = []) : Statement
     {
-        if (empty($values)) {
-            throw QueryException::cannotInsertEmptyValues();
-        }
-
         if (stripos($table, '`') === false && stripos($table, '.') === false) {
             $table = '`' . $table . '`'; //quote table name for dot names
         }
@@ -477,11 +475,18 @@ class Client
             $sql .= ' (`' . implode('`,`', $columns) . '`) ';
         }
 
-        $sql .= ' VALUES ';
+        $valuesClause = ' VALUES ';
+        $sql .= $valuesClause;
 
         foreach ($values as $row) {
             $sql .= ' (' . FormatLine::Insert($row) . '), ';
         }
+
+
+        if (substr($sql, -strlen($valuesClause)) === $valuesClause){
+            throw QueryException::cannotInsertEmptyValues();
+        }
+
         $sql = trim($sql, ', ');
 
         return $this->transport()->write($sql);
